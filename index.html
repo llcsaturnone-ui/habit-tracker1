@@ -37,10 +37,11 @@
         .pt-safe { padding-top: max(env(safe-area-inset-top), 20px); }
         
         /* Идеальный фикс низа: фон тянется до конца, контент над полоской */
-        .bottom-nav-safe {
-  padding-bottom: env(safe-area-inset-bottom); /* Оставить только системный минимум без добавок */
+        ..bottom-nav-safe {
+  padding-bottom: -50;
   padding-top: 8px;
 }
+
     </style>
 </head>
 <body>
