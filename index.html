@@ -1,364 +1,380 @@
 <!DOCTYPE html>
+
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <!-- Шаг 1 из вашего совета: viewport-fit=cover уже тут есть -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Трекер Дисциплины</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
 
-    <style>
-        /* Применяем 100dvh к самому body, чтобы избежать прыжков Safari */
-        html, body { 
-            background-color: #ffffff; 
-            margin: 0; 
-            padding: 0; 
-            height: 100dvh; 
-            overflow: hidden; 
-            -webkit-user-select: none; 
-            user-select: none; 
-        }
-        ::-webkit-scrollbar { display: none; }
-        
-        /* Защита верхнего островка */
-        .pt-safe { padding-top: max(env(safe-area-inset-top), 20px); }
-        
-        /* Шаг 2 из вашего совета: защита нижнего меню */
-        .pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 16px); }
-    </style>
+```
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<style>
+    /* Убрали 100vh — он врёт на iOS Safari. 
+       Используем только 100% чтобы body растянулся по факту. */
+    html { 
+        height: 100%; 
+        background-color: #ffffff;
+    }
+    body { 
+        background-color: #ffffff; 
+        margin: 0; 
+        padding: 0; 
+        height: 100%;
+        overflow: hidden; 
+        -webkit-user-select: none; 
+        user-select: none; 
+    }
+    #root {
+        height: 100%;
+        overflow: hidden;
+    }
+    
+    ::-webkit-scrollbar { display: none; }
+    
+    /* Защита верхнего островка */
+    .pt-safe { padding-top: max(env(safe-area-inset-top), 20px); }
+    
+    /* Нижнее меню: 34px — реальный размер safe area на iPhone с home indicator */
+    .bottom-nav-safe { 
+        padding-bottom: max(env(safe-area-inset-bottom), 34px); 
+        padding-top: 8px;
+    }
+</style>
+```
+
 </head>
 <body>
     <div id="root"></div>
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+```
+<script type="text/babel">
+    const { useState, useEffect } = React;
 
-        const Icon = ({ name, className }) => {
-            const spanRef = React.useRef(null);
-            useEffect(() => {
-                if (spanRef.current) {
-                    spanRef.current.innerHTML = `<i data-lucide="${name}" class="${className || ''}"></i>`;
-                    lucide.createIcons({ root: spanRef.current });
-                }
-            }, [name, className]);
-            return <span ref={spanRef} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}></span>;
+    const Icon = ({ name, className }) => {
+        const spanRef = React.useRef(null);
+        useEffect(() => {
+            if (spanRef.current) {
+                spanRef.current.innerHTML = `<i data-lucide="${name}" class="${className || ''}"></i>`;
+                lucide.createIcons({ root: spanRef.current });
+            }
+        }, [name, className]);
+        return <span ref={spanRef} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}></span>;
+    };
+
+    const HabitTracker = () => {
+        const initialHabits = [
+            { id: '1', name: 'Фаджр (Утренний)', parentId: null, customPrice: null },
+            { id: '1-sub', name: 'Зикр после Фаджра', parentId: '1', customPrice: null },
+            { id: '2', name: 'Зухр (Обеденный)', parentId: null, customPrice: null },
+            { id: '2-sub', name: 'Зикр после Зухра', parentId: '2', customPrice: null },
+            { id: '3', name: 'Аср (Предвечерний)', parentId: null, customPrice: null },
+            { id: '3-sub', name: 'Зикр после Асра', parentId: '3', customPrice: null },
+            { id: '4', name: 'Магриб (Вечерний)', parentId: null, customPrice: null },
+            { id: '4-sub', name: 'Зикр после Магриба', parentId: '4', customPrice: null },
+            { id: '5', name: 'Иша (Ночной)', parentId: null, customPrice: null },
+            { id: '5-sub', name: 'Зикр после Иша', parentId: '5', customPrice: null },
+        ];
+
+        const [activeTab, setActiveTab] = useState('tracker'); 
+        const [budget, setBudget] = useState(10000);
+        const [habits, setHabits] = useState(initialHabits);
+        const [records, setRecords] = useState({});
+        const [shopItems, setShopItems] = useState([]);
+        const [currentDate, setCurrentDate] = useState(() => new Date().toISOString().split('T')[0]);
+        
+        const [newHabitName, setNewHabitName] = useState('');
+        const [addingSubTo, setAddingSubTo] = useState(null);
+        const [newSubName, setNewSubName] = useState('');
+        const [newItemName, setNewItemName] = useState('');
+        const [newItemPrice, setNewItemPrice] = useState('');
+
+        useEffect(() => {
+            const savedData = localStorage.getItem('islamicHabitTrackerV4');
+            if (savedData) {
+                const parsed = JSON.parse(savedData);
+                setBudget(parsed.budget || 10000);
+                setHabits(parsed.habits && parsed.habits.length > 0 ? parsed.habits : initialHabits);
+                setRecords(parsed.records || {});
+                setShopItems(parsed.shopItems || []);
+            }
+        }, []);
+
+        useEffect(() => {
+            localStorage.setItem('islamicHabitTrackerV4', JSON.stringify({ budget, habits, records, shopItems }));
+        }, [budget, habits, records, shopItems]);
+
+        const totalHabits = habits.length;
+        const standardPrice = totalHabits > 0 ? (budget / (totalHabits * 7)) : 0;
+        const getHabitBasePrice = (habit) => habit.customPrice !== null && habit.customPrice !== '' ? parseFloat(habit.customPrice) : standardPrice;
+
+        const getHabitStats = (habitId, date) => {
+            let streakBefore = 0;
+            let d = new Date(date);
+            d.setDate(d.getDate() - 1); 
+
+            for (let i = 0; i < 365; i++) {
+                const dateStr = d.toISOString().split('T')[0];
+                if (records[`${dateStr}_${habitId}`]?.status === 'done') {
+                    streakBefore++;
+                    d.setDate(d.getDate() - 1);
+                } else break; 
+            }
+
+            const bonusPercent = Math.floor(streakBefore / 7) * 10;
+            return { streakBefore, bonusPercent, multiplier: 1 + (bonusPercent / 100) };
         };
 
-        const HabitTracker = () => {
-            const initialHabits = [
-                { id: '1', name: 'Фаджр (Утренний)', parentId: null, customPrice: null },
-                { id: '1-sub', name: 'Зикр после Фаджра', parentId: '1', customPrice: null },
-                { id: '2', name: 'Зухр (Обеденный)', parentId: null, customPrice: null },
-                { id: '2-sub', name: 'Зикр после Зухра', parentId: '2', customPrice: null },
-                { id: '3', name: 'Аср (Предвечерний)', parentId: null, customPrice: null },
-                { id: '3-sub', name: 'Зикр после Асра', parentId: '3', customPrice: null },
-                { id: '4', name: 'Магриб (Вечерний)', parentId: null, customPrice: null },
-                { id: '4-sub', name: 'Зикр после Магриба', parentId: '4', customPrice: null },
-                { id: '5', name: 'Иша (Ночной)', parentId: null, customPrice: null },
-                { id: '5-sub', name: 'Зикр после Иша', parentId: '5', customPrice: null },
-            ];
+        const totalEarnedAndFined = Object.values(records).reduce((sum, record) => sum + record.amount, 0);
+        const totalSpent = shopItems.filter(item => item.isBought).reduce((sum, item) => sum + item.price, 0);
+        const currentBalance = totalEarnedAndFined - totalSpent;
 
-            const [activeTab, setActiveTab] = useState('tracker'); 
-            const [budget, setBudget] = useState(10000);
-            const [habits, setHabits] = useState(initialHabits);
-            const [records, setRecords] = useState({});
-            const [shopItems, setShopItems] = useState([]);
-            const [currentDate, setCurrentDate] = useState(() => new Date().toISOString().split('T')[0]);
-            
-            const [newHabitName, setNewHabitName] = useState('');
-            const [addingSubTo, setAddingSubTo] = useState(null);
-            const [newSubName, setNewSubName] = useState('');
-            const [newItemName, setNewItemName] = useState('');
-            const [newItemPrice, setNewItemPrice] = useState('');
+        const formatMoney = (val) => Number(val).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' ₽';
+        const formatDateHeader = (dateStr) => {
+            const d = new Date(dateStr);
+            return `${d.getDate()} ${d.toLocaleDateString('ru-RU', { month: 'long' })}, ${d.toLocaleDateString('ru-RU', { weekday: 'short' }).charAt(0).toUpperCase() + d.toLocaleDateString('ru-RU', { weekday: 'short' }).slice(1)}`;
+        };
 
-            useEffect(() => {
-                const savedData = localStorage.getItem('islamicHabitTrackerV4');
-                if (savedData) {
-                    const parsed = JSON.parse(savedData);
-                    setBudget(parsed.budget || 10000);
-                    setHabits(parsed.habits && parsed.habits.length > 0 ? parsed.habits : initialHabits);
-                    setRecords(parsed.records || {});
-                    setShopItems(parsed.shopItems || []);
-                }
-            }, []);
+        const handleMarkHabit = (habit, status) => {
+            const stats = getHabitStats(habit.id, currentDate);
+            const basePrice = getHabitBasePrice(habit);
+            const amount = status === 'done' ? Math.round(basePrice * stats.multiplier) : -Math.round(basePrice * 3);
+            setRecords(prev => ({ ...prev, [`${currentDate}_${habit.id}`]: { status, amount } }));
+        };
 
-            useEffect(() => {
-                localStorage.setItem('islamicHabitTrackerV4', JSON.stringify({ budget, habits, records, shopItems }));
-            }, [budget, habits, records, shopItems]);
+        const handleUndoHabit = (habitId) => {
+            setRecords(prev => { const newRecords = { ...prev }; delete newRecords[`${currentDate}_${habitId}`]; return newRecords; });
+        };
 
-            const totalHabits = habits.length;
-            const standardPrice = totalHabits > 0 ? (budget / (totalHabits * 7)) : 0;
-            const getHabitBasePrice = (habit) => habit.customPrice !== null && habit.customPrice !== '' ? parseFloat(habit.customPrice) : standardPrice;
+        const shiftDate = (days) => {
+            const d = new Date(currentDate); d.setDate(d.getDate() + days); setCurrentDate(d.toISOString().split('T')[0]);
+        };
 
-            const getHabitStats = (habitId, date) => {
-                let streakBefore = 0;
-                let d = new Date(date);
-                d.setDate(d.getDate() - 1); 
+        const handleAddItem = () => {
+            if (newItemName.trim() && newItemPrice > 0) {
+                setShopItems([...shopItems, { id: Date.now().toString(), name: newItemName.trim(), price: Number(newItemPrice), isBought: false }]);
+                setNewItemName(''); setNewItemPrice('');
+            }
+        };
+        const handleBuyItem = (item) => currentBalance >= item.price ? setShopItems(shopItems.map(i => i.id === item.id ? { ...i, isBought: true } : i)) : alert('Недостаточно средств!');
+        const handleDeleteItem = (id) => setShopItems(shopItems.filter(i => i.id !== id));
 
-                for (let i = 0; i < 365; i++) {
-                    const dateStr = d.toISOString().split('T')[0];
-                    if (records[`${dateStr}_${habitId}`]?.status === 'done') {
-                        streakBefore++;
-                        d.setDate(d.getDate() - 1);
-                    } else break; 
-                }
+        const handleAddMainHabit = () => { if (newHabitName.trim()) { setHabits([...habits, { id: Date.now().toString(), name: newHabitName.trim(), parentId: null, customPrice: null }]); setNewHabitName(''); }};
+        const handleAddSubHabit = (parentId) => { if (newSubName.trim()) { setHabits([...habits, { id: Date.now().toString(), name: newSubName.trim(), parentId, customPrice: null }]); setNewSubName(''); setAddingSubTo(null); }};
+        const handleDeleteHabit = (id) => setHabits(habits.filter(h => h.id !== id && h.parentId !== id));
+        const handleCustomPriceChange = (id, value) => setHabits(habits.map(h => h.id === id ? { ...h, customPrice: value === '' ? null : value } : h));
 
-                const bonusPercent = Math.floor(streakBefore / 7) * 10;
-                return { streakBefore, bonusPercent, multiplier: 1 + (bonusPercent / 100) };
-            };
+        const StatusBar = ({ habitId }) => {
+            const days = [];
+            const currDateObj = new Date(currentDate);
+            const currentDayOfWeek = currDateObj.getDay(); 
+            const diffToMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
+            const monday = new Date(currDateObj); monday.setDate(monday.getDate() - diffToMonday);
 
-            const totalEarnedAndFined = Object.values(records).reduce((sum, record) => sum + record.amount, 0);
-            const totalSpent = shopItems.filter(item => item.isBought).reduce((sum, item) => sum + item.price, 0);
-            const currentBalance = totalEarnedAndFined - totalSpent;
+            for(let i = 0; i < 7; i++) {
+                const d = new Date(monday); d.setDate(d.getDate() + i);
+                const dateStr = d.toISOString().split('T')[0];
+                days.push({ status: records[`${dateStr}_${habitId}`]?.status, dayName: d.toLocaleDateString('ru-RU', { weekday: 'short' }), isSelectedDay: dateStr === currentDate });
+            }
 
-            const formatMoney = (val) => Number(val).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' ₽';
-            const formatDateHeader = (dateStr) => {
-                const d = new Date(dateStr);
-                return `${d.getDate()} ${d.toLocaleDateString('ru-RU', { month: 'long' })}, ${d.toLocaleDateString('ru-RU', { weekday: 'short' }).charAt(0).toUpperCase() + d.toLocaleDateString('ru-RU', { weekday: 'short' }).slice(1)}`;
-            };
+            return (
+                <div className="flex space-x-[4px]">
+                    {days.map((day, idx) => (
+                        <div key={idx} className="flex flex-col items-center gap-[2px] w-[18px]">
+                            <div className={`w-full h-2 rounded-[2px] transition-colors ${day.status === 'done' ? 'bg-emerald-500' : day.status === 'missed' ? 'bg-red-500' : 'bg-gray-200'}`} />
+                            <span className={`text-[7px] uppercase font-bold tracking-wider leading-none ${day.isSelectedDay ? 'text-indigo-600' : 'text-gray-400'}`}>{day.dayName}</span>
+                        </div>
+                    ))}
+                </div>
+            );
+        };
 
-            const handleMarkHabit = (habit, status) => {
-                const stats = getHabitStats(habit.id, currentDate);
-                const basePrice = getHabitBasePrice(habit);
-                const amount = status === 'done' ? Math.round(basePrice * stats.multiplier) : -Math.round(basePrice * 3);
-                setRecords(prev => ({ ...prev, [`${currentDate}_${habit.id}`]: { status, amount } }));
-            };
+        const HabitRow = ({ habit, isSub }) => {
+            const record = records[`${currentDate}_${habit.id}`];
+            const basePrice = getHabitBasePrice(habit);
+            const stats = getHabitStats(habit.id, currentDate);
+            const currentStreakDisplay = record?.status === 'done' ? stats.streakBefore + 1 : stats.streakBefore;
+            const activeBonus = record?.status === 'done' ? Math.floor((stats.streakBefore + 1) / 7) * 10 : stats.bonusPercent;
 
-            const handleUndoHabit = (habitId) => {
-                setRecords(prev => { const newRecords = { ...prev }; delete newRecords[`${currentDate}_${habitId}`]; return newRecords; });
-            };
-
-            const shiftDate = (days) => {
-                const d = new Date(currentDate); d.setDate(d.getDate() + days); setCurrentDate(d.toISOString().split('T')[0]);
-            };
-
-            const handleAddItem = () => {
-                if (newItemName.trim() && newItemPrice > 0) {
-                    setShopItems([...shopItems, { id: Date.now().toString(), name: newItemName.trim(), price: Number(newItemPrice), isBought: false }]);
-                    setNewItemName(''); setNewItemPrice('');
-                }
-            };
-            const handleBuyItem = (item) => currentBalance >= item.price ? setShopItems(shopItems.map(i => i.id === item.id ? { ...i, isBought: true } : i)) : alert('Недостаточно средств!');
-            const handleDeleteItem = (id) => setShopItems(shopItems.filter(i => i.id !== id));
-
-            const handleAddMainHabit = () => { if (newHabitName.trim()) { setHabits([...habits, { id: Date.now().toString(), name: newHabitName.trim(), parentId: null, customPrice: null }]); setNewHabitName(''); }};
-            const handleAddSubHabit = (parentId) => { if (newSubName.trim()) { setHabits([...habits, { id: Date.now().toString(), name: newSubName.trim(), parentId, customPrice: null }]); setNewSubName(''); setAddingSubTo(null); }};
-            const handleDeleteHabit = (id) => setHabits(habits.filter(h => h.id !== id && h.parentId !== id));
-            const handleCustomPriceChange = (id, value) => setHabits(habits.map(h => h.id === id ? { ...h, customPrice: value === '' ? null : value } : h));
-
-            const StatusBar = ({ habitId }) => {
-                const days = [];
-                const currDateObj = new Date(currentDate);
-                const currentDayOfWeek = currDateObj.getDay(); 
-                const diffToMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
-                const monday = new Date(currDateObj); monday.setDate(monday.getDate() - diffToMonday);
-
-                for(let i = 0; i < 7; i++) {
-                    const d = new Date(monday); d.setDate(d.getDate() + i);
-                    const dateStr = d.toISOString().split('T')[0];
-                    days.push({ status: records[`${dateStr}_${habitId}`]?.status, dayName: d.toLocaleDateString('ru-RU', { weekday: 'short' }), isSelectedDay: dateStr === currentDate });
-                }
-
-                return (
-                    <div className="flex space-x-[4px]">
-                        {days.map((day, idx) => (
-                            <div key={idx} className="flex flex-col items-center gap-[2px] w-[18px]">
-                                <div className={`w-full h-2 rounded-[2px] transition-colors ${day.status === 'done' ? 'bg-emerald-500' : day.status === 'missed' ? 'bg-red-500' : 'bg-gray-200'}`} />
-                                <span className={`text-[7px] uppercase font-bold tracking-wider leading-none ${day.isSelectedDay ? 'text-indigo-600' : 'text-gray-400'}`}>{day.dayName}</span>
-                            </div>
-                        ))}
-                    </div>
-                );
-            };
-
-            const HabitRow = ({ habit, isSub }) => {
-                const record = records[`${currentDate}_${habit.id}`];
-                const basePrice = getHabitBasePrice(habit);
-                const stats = getHabitStats(habit.id, currentDate);
-                const currentStreakDisplay = record?.status === 'done' ? stats.streakBefore + 1 : stats.streakBefore;
-                const activeBonus = record?.status === 'done' ? Math.floor((stats.streakBefore + 1) / 7) * 10 : stats.bonusPercent;
-
-                return (
-                    <div className={`px-3 py-2.5 flex transition-colors ${record?.status === 'done' ? 'bg-emerald-50/40' : record?.status === 'missed' ? 'bg-red-50/40' : 'bg-white hover:bg-gray-50'} ${isSub ? 'pl-7 relative' : ''}`}>
-                        {isSub && <div className="absolute left-2.5 top-3.5 text-gray-300"><Icon name="corner-down-right" className="w-4 h-4" /></div>}
-                        
-                        <div className="flex-1 flex flex-col justify-center min-w-0 pr-3 space-y-1">
-                            <div className="flex items-center space-x-2 overflow-hidden">
-                                <span className={`truncate text-gray-800 ${isSub ? 'text-[14px] font-medium' : 'text-[15px] font-bold'}`}>{habit.name}</span>
-                                {currentStreakDisplay > 0 && <span className={`flex items-center shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${activeBonus > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}`}><Icon name="flame" className="w-3 h-3 mr-0.5" /> {currentStreakDisplay}</span>}
-                            </div>
-                            
-                            <div className="flex items-end space-x-4">
-                                <StatusBar habitId={habit.id} />
-                                <div className="flex items-center space-x-2 text-[10px] uppercase tracking-wide pb-[1px]">
-                                    <span className="text-emerald-500 font-extrabold">+{formatMoney(basePrice * stats.multiplier)}</span>
-                                    <span className="text-red-400 font-extrabold">-{formatMoney(basePrice * 3)}</span>
-                                </div>
-                            </div>
+            return (
+                <div className={`px-3 py-2.5 flex transition-colors ${record?.status === 'done' ? 'bg-emerald-50/40' : record?.status === 'missed' ? 'bg-red-50/40' : 'bg-white hover:bg-gray-50'} ${isSub ? 'pl-7 relative' : ''}`}>
+                    {isSub && <div className="absolute left-2.5 top-3.5 text-gray-300"><Icon name="corner-down-right" className="w-4 h-4" /></div>}
+                    
+                    <div className="flex-1 flex flex-col justify-center min-w-0 pr-3 space-y-1">
+                        <div className="flex items-center space-x-2 overflow-hidden">
+                            <span className={`truncate text-gray-800 ${isSub ? 'text-[14px] font-medium' : 'text-[15px] font-bold'}`}>{habit.name}</span>
+                            {currentStreakDisplay > 0 && <span className={`flex items-center shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${activeBonus > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}`}><Icon name="flame" className="w-3 h-3 mr-0.5" /> {currentStreakDisplay}</span>}
                         </div>
                         
-                        <div className="flex items-center space-x-2 shrink-0">
-                            {!record ? (
-                                <>
-                                    <button onClick={() => handleMarkHabit(habit, 'done')} className="flex items-center justify-center px-4 py-2 bg-emerald-100 text-emerald-600 rounded-xl hover:bg-emerald-200 active:bg-emerald-300 active:scale-95 transition-all duration-150">
-                                        <Icon name="circle-check" className="w-6 h-6" />
-                                    </button>
-                                    <button onClick={() => handleMarkHabit(habit, 'missed')} className="flex items-center justify-center px-4 py-2 bg-red-100 text-red-500 rounded-xl hover:bg-red-200 active:bg-red-300 active:scale-95 transition-all duration-150">
-                                        <Icon name="circle-x" className="w-6 h-6" />
-                                    </button>
-                                </>
-                            ) : (
-                                <button onClick={() => handleUndoHabit(habit.id)} className="flex items-center justify-center px-5 py-2.5 bg-gray-100 text-gray-500 rounded-xl hover:bg-gray-200 active:bg-gray-300 active:scale-95 transition-all duration-150 text-[11px] font-bold uppercase">
-                                    <Icon name="undo-2" className="w-4 h-4 mr-1.5" /> Отмена
+                        <div className="flex items-end space-x-4">
+                            <StatusBar habitId={habit.id} />
+                            <div className="flex items-center space-x-2 text-[10px] uppercase tracking-wide pb-[1px]">
+                                <span className="text-emerald-500 font-extrabold">+{formatMoney(basePrice * stats.multiplier)}</span>
+                                <span className="text-red-400 font-extrabold">-{formatMoney(basePrice * 3)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2 shrink-0">
+                        {!record ? (
+                            <>
+                                <button onClick={() => handleMarkHabit(habit, 'done')} className="flex items-center justify-center px-4 py-2 bg-emerald-100 text-emerald-600 rounded-xl hover:bg-emerald-200 active:bg-emerald-300 active:scale-95 transition-all duration-150">
+                                    <Icon name="circle-check" className="w-6 h-6" />
                                 </button>
+                                <button onClick={() => handleMarkHabit(habit, 'missed')} className="flex items-center justify-center px-4 py-2 bg-red-100 text-red-500 rounded-xl hover:bg-red-200 active:bg-red-300 active:scale-95 transition-all duration-150">
+                                    <Icon name="circle-x" className="w-6 h-6" />
+                                </button>
+                            </>
+                        ) : (
+                            <button onClick={() => handleUndoHabit(habit.id)} className="flex items-center justify-center px-5 py-2.5 bg-gray-100 text-gray-500 rounded-xl hover:bg-gray-200 active:bg-gray-300 active:scale-95 transition-all duration-150 text-[11px] font-bold uppercase">
+                                <Icon name="undo-2" className="w-4 h-4 mr-1.5" /> Отмена
+                            </button>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const renderTracker = () => {
+            const mainHabits = habits.filter(h => !h.parentId);
+            return (
+                <div className="space-y-2 pb-2">
+                    {mainHabits.length === 0 ? <p className="text-center text-gray-500 py-8 text-sm">Привычек нет.</p> : mainHabits.map(mainHabit => (
+                        <div key={mainHabit.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                            <HabitRow habit={mainHabit} isSub={false} />
+                            {habits.filter(h => h.parentId === mainHabit.id).length > 0 && (
+                                <div className="border-t border-gray-50 bg-gray-50/20">
+                                    {habits.filter(h => h.parentId === mainHabit.id).map((sub, index) => <div key={sub.id} className={index !== 0 ? 'border-t border-gray-50' : ''}><HabitRow habit={sub} isSub={true} /></div>)}
+                                </div>
                             )}
                         </div>
-                    </div>
-                );
-            };
-
-            const renderTracker = () => {
-                const mainHabits = habits.filter(h => !h.parentId);
-                return (
-                    <div className="space-y-2 pb-2">
-                        {mainHabits.length === 0 ? <p className="text-center text-gray-500 py-8 text-sm">Привычек нет.</p> : mainHabits.map(mainHabit => (
-                            <div key={mainHabit.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                                <HabitRow habit={mainHabit} isSub={false} />
-                                {habits.filter(h => h.parentId === mainHabit.id).length > 0 && (
-                                    <div className="border-t border-gray-50 bg-gray-50/20">
-                                        {habits.filter(h => h.parentId === mainHabit.id).map((sub, index) => <div key={sub.id} className={index !== 0 ? 'border-t border-gray-50' : ''}><HabitRow habit={sub} isSub={true} /></div>)}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                );
-            };
-
-            const renderShop = () => (
-                <div className="space-y-3 pb-4">
-                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-center">
-                        <p className="text-indigo-800 text-[11px] font-bold uppercase tracking-wider mb-0.5">Доступно для покупок</p>
-                        <div className="text-2xl font-extrabold text-indigo-600">{formatMoney(currentBalance)}</div>
-                    </div>
-                    <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
-                        <h3 className="text-xs font-bold text-gray-800 mb-2 flex items-center"><Icon name="plus" className="w-3.5 h-3.5 mr-1.5 text-indigo-500"/> Добавить цель</h3>
-                        <div className="flex space-x-1.5">
-                            <input type="text" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} placeholder="Название" className="flex-1 p-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-xs" />
-                            <input type="number" value={newItemPrice} onChange={(e) => setNewItemPrice(e.target.value)} placeholder="Цена ₽" className="w-16 p-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-xs text-center" />
-                            <button onClick={handleAddItem} className="bg-indigo-600 text-white p-2 rounded-lg flex justify-center items-center"><Icon name="plus" className="w-4 h-4" /></button>
-                        </div>
-                    </div>
-                    <div className="space-y-1.5">
-                        {shopItems.length === 0 ? <p className="text-center text-gray-500 text-xs py-4">Магазин пуст.</p> : shopItems.map(item => (
-                            <div key={item.id} className={`flex items-center justify-between p-2.5 rounded-lg border ${item.isBought ? 'bg-gray-50 border-gray-200 opacity-70' : 'bg-white shadow-sm'}`}>
-                                <div className="flex flex-col"><span className={`font-semibold text-xs ${item.isBought ? 'text-gray-500 line-through' : 'text-gray-800'}`}>{item.name}</span><span className={`text-[10px] font-bold ${item.isBought ? 'text-gray-400' : 'text-indigo-600'}`}>{formatMoney(item.price)}</span></div>
-                                <div className="flex items-center space-x-1.5">
-                                    {!item.isBought ? <button onClick={() => handleBuyItem(item)} disabled={currentBalance < item.price} className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold flex items-center uppercase justify-center ${currentBalance >= item.price ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-400'}`}><Icon name="shopping-bag" className="w-3 h-3 mr-1" /> Купить</button> : <span className="px-2 py-1 bg-gray-200 text-gray-600 rounded-md text-[9px] font-bold uppercase tracking-wider flex items-center justify-center"><Icon name="circle-check" className="w-3 h-3 mr-1" /> Куплено</span>}
-                                    <button onClick={() => handleDeleteItem(item.id)} className="p-1 text-gray-400 hover:text-red-500 flex justify-center items-center"><Icon name="trash-2" className="w-4 h-4" /></button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                    ))}
                 </div>
             );
+        };
 
-            const renderSettings = () => {
-                const mainHabits = habits.filter(h => !h.parentId);
-                return (
-                    <div className="space-y-3 pb-4">
-                        <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
-                            <h3 className="text-xs font-bold text-gray-800 mb-2 flex items-center"><Icon name="wallet" className="w-3.5 h-3.5 mr-1.5 text-indigo-500"/> Бюджет</h3>
-                            <div className="space-y-2">
-                                <div><label className="block text-[10px] font-bold uppercase text-gray-500 mb-1">На 7 дней (₽)</label><input type="number" value={budget} onChange={(e) => setBudget(Number(e.target.value))} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-xs" /></div>
-                                <div className="bg-indigo-50 p-2 rounded-lg flex justify-between items-center text-indigo-900"><span className="font-semibold text-[10px] uppercase">Цена по умолчанию:</span><span className="font-bold text-sm">{formatMoney(standardPrice)}</span></div>
+        const renderShop = () => (
+            <div className="space-y-3 pb-4">
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-center">
+                    <p className="text-indigo-800 text-[11px] font-bold uppercase tracking-wider mb-0.5">Доступно для покупок</p>
+                    <div className="text-2xl font-extrabold text-indigo-600">{formatMoney(currentBalance)}</div>
+                </div>
+                <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+                    <h3 className="text-xs font-bold text-gray-800 mb-2 flex items-center"><Icon name="plus" className="w-3.5 h-3.5 mr-1.5 text-indigo-500"/> Добавить цель</h3>
+                    <div className="flex space-x-1.5">
+                        <input type="text" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} placeholder="Название" className="flex-1 p-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-xs" />
+                        <input type="number" value={newItemPrice} onChange={(e) => setNewItemPrice(e.target.value)} placeholder="Цена ₽" className="w-16 p-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-xs text-center" />
+                        <button onClick={handleAddItem} className="bg-indigo-600 text-white p-2 rounded-lg flex justify-center items-center"><Icon name="plus" className="w-4 h-4" /></button>
+                    </div>
+                </div>
+                <div className="space-y-1.5">
+                    {shopItems.length === 0 ? <p className="text-center text-gray-500 text-xs py-4">Магазин пуст.</p> : shopItems.map(item => (
+                        <div key={item.id} className={`flex items-center justify-between p-2.5 rounded-lg border ${item.isBought ? 'bg-gray-50 border-gray-200 opacity-70' : 'bg-white shadow-sm'}`}>
+                            <div className="flex flex-col"><span className={`font-semibold text-xs ${item.isBought ? 'text-gray-500 line-through' : 'text-gray-800'}`}>{item.name}</span><span className={`text-[10px] font-bold ${item.isBought ? 'text-gray-400' : 'text-indigo-600'}`}>{formatMoney(item.price)}</span></div>
+                            <div className="flex items-center space-x-1.5">
+                                {!item.isBought ? <button onClick={() => handleBuyItem(item)} disabled={currentBalance < item.price} className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold flex items-center uppercase justify-center ${currentBalance >= item.price ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-400'}`}><Icon name="shopping-bag" className="w-3 h-3 mr-1" /> Купить</button> : <span className="px-2 py-1 bg-gray-200 text-gray-600 rounded-md text-[9px] font-bold uppercase tracking-wider flex items-center justify-center"><Icon name="circle-check" className="w-3 h-3 mr-1" /> Куплено</span>}
+                                <button onClick={() => handleDeleteItem(item.id)} className="p-1 text-gray-400 hover:text-red-500 flex justify-center items-center"><Icon name="trash-2" className="w-4 h-4" /></button>
                             </div>
                         </div>
-                        <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
-                            <h3 className="text-xs font-bold text-gray-800 mb-2 flex items-center"><Icon name="settings" className="w-3.5 h-3.5 mr-1.5 text-indigo-500"/> Привычки</h3>
-                            <div className="flex space-x-1.5 mb-3">
-                                <input type="text" value={newHabitName} onChange={(e) => setNewHabitName(e.target.value)} placeholder="Новая привычка..." className="flex-1 p-2 bg-gray-50 border rounded-lg outline-none text-xs" onKeyDown={(e) => e.key === 'Enter' && handleAddMainHabit()} />
-                                <button onClick={handleAddMainHabit} className="bg-indigo-600 text-white p-2 rounded-lg flex justify-center items-center"><Icon name="plus" className="w-4 h-4" /></button>
-                            </div>
-                            <div className="space-y-1.5">
-                                {mainHabits.map((main) => (
-                                    <div key={main.id} className="space-y-1">
-                                        <div className="flex items-center space-x-1.5 p-2 bg-gray-50 rounded-lg border border-gray-100"><span className="flex-1 font-semibold text-[12px]">{main.name}</span><div className="flex items-center space-x-1"><div className="flex flex-col w-12"><span className="text-[7px] text-gray-500 uppercase font-bold tracking-widest mb-0.5 text-center">Своя ₽</span><input type="number" placeholder={Math.round(standardPrice)} value={main.customPrice || ''} onChange={(e) => handleCustomPriceChange(main.id, e.target.value)} className="w-full p-1 text-[11px] border rounded outline-none text-center" /></div><button onClick={() => handleDeleteHabit(main.id)} className="p-1 text-red-400 mt-2.5 flex justify-center items-center"><Icon name="trash-2" className="w-4 h-4" /></button></div></div>
-                                        {habits.filter(h => h.parentId === main.id).map(sub => <div key={sub.id} className="flex items-center space-x-1.5 p-1.5 ml-3 bg-gray-50/50 border-l-2 border-l-indigo-200"><span className="flex-1 font-medium text-[12px]">{sub.name}</span><div className="flex items-center space-x-1"><div className="flex flex-col w-12"><span className="text-[7px] text-gray-500 uppercase font-bold tracking-widest mb-0.5 text-center">Своя ₽</span><input type="number" placeholder={Math.round(standardPrice)} value={sub.customPrice || ''} onChange={(e) => handleCustomPriceChange(sub.id, e.target.value)} className="w-full p-1 text-[11px] border rounded outline-none text-center" /></div><button onClick={() => handleDeleteHabit(sub.id)} className="p-1 text-red-400 mt-2.5 flex justify-center items-center"><Icon name="trash-2" className="w-4 h-4" /></button></div></div>)}
-                                        {addingSubTo === main.id ? <div className="ml-3 flex space-x-1 mt-1"><input autoFocus type="text" value={newSubName} onChange={(e) => setNewSubName(e.target.value)} placeholder="Название..." className="flex-1 p-1 text-[11px] border rounded outline-none" onKeyDown={(e) => e.key === 'Enter' && handleAddSubHabit(main.id)} /><button onClick={() => handleAddSubHabit(main.id)} className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-[11px] font-bold">OK</button><button onClick={() => setAddingSubTo(null)} className="bg-gray-100 text-gray-500 px-2 py-1 rounded text-[11px]">Отмена</button></div> : <button onClick={() => setAddingSubTo(main.id)} className="ml-3 text-[10px] text-indigo-500 font-bold uppercase flex items-center py-0.5 hover:text-indigo-700"><Icon name="corner-down-right" className="w-3 h-3 mr-1" /> Подпривычка</button>}
-                                    </div>
-                                ))}
-                            </div>
+                    ))}
+                </div>
+            </div>
+        );
+
+        const renderSettings = () => {
+            const mainHabits = habits.filter(h => !h.parentId);
+            return (
+                <div className="space-y-3 pb-4">
+                    <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+                        <h3 className="text-xs font-bold text-gray-800 mb-2 flex items-center"><Icon name="wallet" className="w-3.5 h-3.5 mr-1.5 text-indigo-500"/> Бюджет</h3>
+                        <div className="space-y-2">
+                            <div><label className="block text-[10px] font-bold uppercase text-gray-500 mb-1">На 7 дней (₽)</label><input type="number" value={budget} onChange={(e) => setBudget(Number(e.target.value))} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-xs" /></div>
+                            <div className="bg-indigo-50 p-2 rounded-lg flex justify-between items-center text-indigo-900"><span className="font-semibold text-[10px] uppercase">Цена по умолчанию:</span><span className="font-bold text-sm">{formatMoney(standardPrice)}</span></div>
                         </div>
                     </div>
-                );
-            };
-
-            // Главный контейнер: h-[100dvh] + Flexbox. Убрали "absolute bottom-0" у навигации.
-            return (
-                <div className="h-[100dvh] w-full bg-white font-sans text-gray-900 flex justify-center">
-                    <div className="w-full max-w-md bg-gray-50 flex flex-col h-full relative overflow-hidden">
-                        
-                        <header className="shrink-0 bg-indigo-600 text-white pb-3 px-4 shadow-md rounded-b-[1.25rem] z-20 pt-safe">
-                            <div className="flex items-center justify-between mb-2 h-7 mt-1">
-                                {activeTab === 'tracker' ? (
-                                    <><button onClick={() => shiftDate(-1)} className="p-1 bg-white/10 rounded-md backdrop-blur-sm flex justify-center items-center"><Icon name="chevron-left" className="w-4 h-4 text-white" /></button><h1 className="text-[15px] font-bold tracking-wide">{formatDateHeader(currentDate)}</h1><button onClick={() => shiftDate(1)} className="p-1 bg-white/10 rounded-md backdrop-blur-sm flex justify-center items-center"><Icon name="chevron-right" className="w-4 h-4 text-white" /></button></>
-                                ) : <h1 className="text-[15px] font-bold tracking-wide text-center w-full">{activeTab === 'shop' ? 'Магазин Наград' : 'Настройки'}</h1>}
-                            </div>
-                            <div className="bg-white/10 rounded-[0.85rem] p-2.5 backdrop-blur-md border border-white/20">
-                                <p className="text-indigo-100 text-[9px] font-bold mb-0.5 uppercase tracking-widest opacity-80">Доступно</p>
-                                <div className="flex items-center space-x-1.5">
-                                    <span className="text-[22px] font-extrabold tracking-tight leading-none">{formatMoney(currentBalance)}</span>
-                                    {currentBalance >= 0 ? <Icon name="trending-up" className="w-4 h-4 text-emerald-300" /> : <Icon name="trending-down" className="w-4 h-4 text-red-300" />}
+                    <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+                        <h3 className="text-xs font-bold text-gray-800 mb-2 flex items-center"><Icon name="settings" className="w-3.5 h-3.5 mr-1.5 text-indigo-500"/> Привычки</h3>
+                        <div className="flex space-x-1.5 mb-3">
+                            <input type="text" value={newHabitName} onChange={(e) => setNewHabitName(e.target.value)} placeholder="Новая привычка..." className="flex-1 p-2 bg-gray-50 border rounded-lg outline-none text-xs" onKeyDown={(e) => e.key === 'Enter' && handleAddMainHabit()} />
+                            <button onClick={handleAddMainHabit} className="bg-indigo-600 text-white p-2 rounded-lg flex justify-center items-center"><Icon name="plus" className="w-4 h-4" /></button>
+                        </div>
+                        <div className="space-y-1.5">
+                            {mainHabits.map((main) => (
+                                <div key={main.id} className="space-y-1">
+                                    <div className="flex items-center space-x-1.5 p-2 bg-gray-50 rounded-lg border border-gray-100"><span className="flex-1 font-semibold text-[12px]">{main.name}</span><div className="flex items-center space-x-1"><div className="flex flex-col w-12"><span className="text-[7px] text-gray-500 uppercase font-bold tracking-widest mb-0.5 text-center">Своя ₽</span><input type="number" placeholder={Math.round(standardPrice)} value={main.customPrice || ''} onChange={(e) => handleCustomPriceChange(main.id, e.target.value)} className="w-full p-1 text-[11px] border rounded outline-none text-center" /></div><button onClick={() => handleDeleteHabit(main.id)} className="p-1 text-red-400 mt-2.5 flex justify-center items-center"><Icon name="trash-2" className="w-4 h-4" /></button></div></div>
+                                    {habits.filter(h => h.parentId === main.id).map(sub => <div key={sub.id} className="flex items-center space-x-1.5 p-1.5 ml-3 bg-gray-50/50 border-l-2 border-l-indigo-200"><span className="flex-1 font-medium text-[12px]">{sub.name}</span><div className="flex items-center space-x-1"><div className="flex flex-col w-12"><span className="text-[7px] text-gray-500 uppercase font-bold tracking-widest mb-0.5 text-center">Своя ₽</span><input type="number" placeholder={Math.round(standardPrice)} value={sub.customPrice || ''} onChange={(e) => handleCustomPriceChange(sub.id, e.target.value)} className="w-full p-1 text-[11px] border rounded outline-none text-center" /></div><button onClick={() => handleDeleteHabit(sub.id)} className="p-1 text-red-400 mt-2.5 flex justify-center items-center"><Icon name="trash-2" className="w-4 h-4" /></button></div></div>)}
+                                    {addingSubTo === main.id ? <div className="ml-3 flex space-x-1 mt-1"><input autoFocus type="text" value={newSubName} onChange={(e) => setNewSubName(e.target.value)} placeholder="Название..." className="flex-1 p-1 text-[11px] border rounded outline-none" onKeyDown={(e) => e.key === 'Enter' && handleAddSubHabit(main.id)} /><button onClick={() => handleAddSubHabit(main.id)} className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-[11px] font-bold">OK</button><button onClick={() => setAddingSubTo(null)} className="bg-gray-100 text-gray-500 px-2 py-1 rounded text-[11px]">Отмена</button></div> : <button onClick={() => setAddingSubTo(main.id)} className="ml-3 text-[10px] text-indigo-500 font-bold uppercase flex items-center py-0.5 hover:text-indigo-700"><Icon name="corner-down-right" className="w-3 h-3 mr-1" /> Подпривычка</button>}
                                 </div>
-                                <div className="mt-2 pt-1.5 border-t border-white/10 flex justify-between text-[10px]">
-                                    <div><p className="text-indigo-200 text-[8px] uppercase font-bold tracking-widest opacity-70">Заработано</p><p className="font-semibold text-emerald-300">{formatMoney(totalEarnedAndFined)}</p></div>
-                                    <div className="text-right"><p className="text-indigo-200 text-[8px] uppercase font-bold tracking-widest opacity-70">Потрачено</p><p className="font-semibold text-orange-200">{formatMoney(totalSpent)}</p></div>
-                                </div>
-                            </div>
-                        </header>
-                        
-                        <main className="flex-1 overflow-y-auto px-2 pt-2 z-0">
-                            {activeTab === 'tracker' && renderTracker()}
-                            {activeTab === 'shop' && renderShop()}
-                            {activeTab === 'settings' && renderSettings()}
-                        </main>
-
-                        {/* Навигация теперь не "absolute", а просто замыкающий блок flex-контейнера. 
-                            Класс pb-safe заставляет ее фон "протекать" до самого низа айфона, 
-                            а сами кнопки остаются над полоской. */}
-                        <nav className="shrink-0 w-full bg-white/95 backdrop-blur-xl border-t border-gray-100 shadow-[0_-5px_10px_rgba(0,0,0,0.03)] z-20 px-2 pt-2 pb-safe">
-                            <div className="flex justify-around items-center">
-                                <button onClick={() => setActiveTab('tracker')} className={`flex-1 flex flex-col items-center justify-center space-y-[3px] py-1 ${activeTab === 'tracker' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                                    <Icon name="circle-check" className="w-[22px] h-[22px]" />
-                                    <span className="text-[9px] font-bold uppercase tracking-widest">Трекер</span>
-                                </button>
-                                <button onClick={() => setActiveTab('shop')} className={`flex-1 flex flex-col items-center justify-center space-y-[3px] py-1 ${activeTab === 'shop' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                                    <Icon name="store" className="w-[22px] h-[22px]" />
-                                    <span className="text-[9px] font-bold uppercase tracking-widest">Магазин</span>
-                                </button>
-                                <button onClick={() => setActiveTab('settings')} className={`flex-1 flex flex-col items-center justify-center space-y-[3px] py-1 ${activeTab === 'settings' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                                    <Icon name="settings" className="w-[22px] h-[22px]" />
-                                    <span className="text-[9px] font-bold uppercase tracking-widest">Настройки</span>
-                                </button>
-                            </div>
-                        </nav>
+                            ))}
+                        </div>
                     </div>
                 </div>
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<HabitTracker />);
-    </script>
+        /* Главный контейнер: h-[100dvh] с фолбэком h-full.
+           100dvh корректно учитывает динамический viewport Safari,
+           а h-full подхватит из body { height: 100% } на старых iOS. */
+        return (
+            <div style={{ height: '100dvh' }} className="w-full bg-white font-sans text-gray-900 flex justify-center">
+                <div className="w-full max-w-md bg-gray-50 flex flex-col h-full relative overflow-hidden">
+                    
+                    <header className="shrink-0 bg-indigo-600 text-white pb-3 px-4 shadow-md rounded-b-[1.25rem] z-20 relative pt-safe">
+                        <div className="flex items-center justify-between mb-2 h-7 mt-1">
+                            {activeTab === 'tracker' ? (
+                                <><button onClick={() => shiftDate(-1)} className="p-1 bg-white/10 rounded-md backdrop-blur-sm flex justify-center items-center"><Icon name="chevron-left" className="w-4 h-4 text-white" /></button><h1 className="text-[15px] font-bold tracking-wide">{formatDateHeader(currentDate)}</h1><button onClick={() => shiftDate(1)} className="p-1 bg-white/10 rounded-md backdrop-blur-sm flex justify-center items-center"><Icon name="chevron-right" className="w-4 h-4 text-white" /></button></>
+                            ) : <h1 className="text-[15px] font-bold tracking-wide text-center w-full">{activeTab === 'shop' ? 'Магазин Наград' : 'Настройки'}</h1>}
+                        </div>
+                        <div className="bg-white/10 rounded-[0.85rem] p-2.5 backdrop-blur-md border border-white/20">
+                            <p className="text-indigo-100 text-[9px] font-bold mb-0.5 uppercase tracking-widest opacity-80">Доступно</p>
+                            <div className="flex items-center space-x-1.5">
+                                <span className="text-[22px] font-extrabold tracking-tight leading-none">{formatMoney(currentBalance)}</span>
+                                {currentBalance >= 0 ? <Icon name="trending-up" className="w-4 h-4 text-emerald-300" /> : <Icon name="trending-down" className="w-4 h-4 text-red-300" />}
+                            </div>
+                            <div className="mt-2 pt-1.5 border-t border-white/10 flex justify-between text-[10px]">
+                                <div><p className="text-indigo-200 text-[8px] uppercase font-bold tracking-widest opacity-70">Заработано</p><p className="font-semibold text-emerald-300">{formatMoney(totalEarnedAndFined)}</p></div>
+                                <div className="text-right"><p className="text-indigo-200 text-[8px] uppercase font-bold tracking-widest opacity-70">Потрачено</p><p className="font-semibold text-orange-200">{formatMoney(totalSpent)}</p></div>
+                            </div>
+                        </div>
+                    </header>
+                    
+                    <main className="flex-1 overflow-y-auto px-2 pt-2 z-0">
+                        {activeTab === 'tracker' && renderTracker()}
+                        {activeTab === 'shop' && renderShop()}
+                        {activeTab === 'settings' && renderSettings()}
+                    </main>
+
+                    <nav className="shrink-0 w-full bg-white/95 backdrop-blur-xl border-t border-gray-100 shadow-[0_-5px_10px_rgba(0,0,0,0.03)] z-20 px-2 bottom-nav-safe">
+                        <div className="flex justify-around items-center">
+                            <button onClick={() => setActiveTab('tracker')} className={`flex-1 flex flex-col items-center justify-center space-y-[3px] ${activeTab === 'tracker' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                                <Icon name="circle-check" className="w-[22px] h-[22px]" />
+                                <span className="text-[9px] font-bold uppercase tracking-widest">Трекер</span>
+                            </button>
+                            <button onClick={() => setActiveTab('shop')} className={`flex-1 flex flex-col items-center justify-center space-y-[3px] ${activeTab === 'shop' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                                <Icon name="store" className="w-[22px] h-[22px]" />
+                                <span className="text-[9px] font-bold uppercase tracking-widest">Магазин</span>
+                            </button>
+                            <button onClick={() => setActiveTab('settings')} className={`flex-1 flex flex-col items-center justify-center space-y-[3px] ${activeTab === 'settings' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                                <Icon name="settings" className="w-[22px] h-[22px]" />
+                                <span className="text-[9px] font-bold uppercase tracking-widest">Настройки</span>
+                            </button>
+                        </div>
+                    </nav>
+                </div>
+            </div>
+        );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<HabitTracker />);
+</script>
+```
+
 </body>
 </html>
-
-
