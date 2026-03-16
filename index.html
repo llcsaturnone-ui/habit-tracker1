@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- Указываем системе цвет шапки (indigo-600) -->
+    <!-- Идеальное решение для верха: системно красим статус-бар iOS в цвет шапки -->
     <meta name="theme-color" content="#4f46e5">
     <title>Трекер Дисциплины</title>
     
@@ -16,28 +16,28 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
-        /* ИСПРАВЛЕНИЕ: Красим базовый фон в синий цвет шапки, чтобы статус-бар сливался с приложением */
+        /* Возвращаем кристально белый фон, чтобы низ (подбородок) сливался с навигацией */
         html { 
             height: 100%; 
-            background-color: #4f46e5; 
+            background-color: #ffffff; 
         }
         
         body, #root { 
-            /* Градиент: верх синий (для статус-бара), низ белый (чтобы подбородок оставался светлым) */
-            background: linear-gradient(to bottom, #4f46e5 0%, #4f46e5 50%, #ffffff 50%, #ffffff 100%);
+            background-color: #ffffff; 
             margin: 0; 
             padding: 0; 
             height: 100%; 
             overflow: hidden; 
-            touch-action: none; 
             -webkit-user-select: none; 
             user-select: none; 
         }
         
         ::-webkit-scrollbar { display: none; }
         
+        /* Защита верхнего островка (камеры) */
         .pt-safe { padding-top: max(env(safe-area-inset-top), 20px); }
         
+        /* Точная защита нижнего меню (34px) - как в той версии, которая сработала идеально */
         .bottom-nav-safe { 
             padding-bottom: max(env(safe-area-inset-bottom), 34px); 
             padding-top: 8px;
