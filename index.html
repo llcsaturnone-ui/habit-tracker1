@@ -38,7 +38,7 @@
         
         /* Идеальный фикс низа: фон тянется до конца, контент над полоской */
         .bottom-nav-safe { 
-            padding-bottom: max(env(safe-area-inset-bottom), 5px); 
+            padding-bottom: min(env(safe-area-inset-bottom), 5px); 
             padding-top: 8px;
         }
     </style>
