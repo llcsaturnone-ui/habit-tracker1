@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- Идеальное решение для покраски верха без поломок CSS -->
+    <!-- Системная покраска верхнего статус-бара в цвет шапки -->
     <meta name="theme-color" content="#4f46e5">
     <title>Трекер Дисциплины</title>
     
@@ -16,13 +16,12 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
-        /* ТОТ САМЫЙ КОД, КОТОРЫЙ СРАБОТАЛ ИДЕАЛЬНО */
+        /* Та самая база, за которую вы меня похвалили */
         html { 
             height: 100%; 
-            background-color: #ffffff; /* Фон строго белый, чтобы низ не красился */
+            background-color: #ffffff;
         }
-        
-        body { 
+        body, #root { 
             background-color: #ffffff; 
             margin: 0; 
             padding: 0; 
@@ -31,17 +30,13 @@
             -webkit-user-select: none; 
             user-select: none; 
         }
-
-        #root {
-            height: 100%;
-            overflow: hidden;
-        }
         
         ::-webkit-scrollbar { display: none; }
         
+        /* Безопасный отступ сверху для "островка" и камеры */
         .pt-safe { padding-top: max(env(safe-area-inset-top), 20px); }
         
-        /* Та самая формула, убирающая подбородок */
+        /* Идеальный фикс низа: фон тянется до конца, контент над полоской */
         .bottom-nav-safe { 
             padding-bottom: max(env(safe-area-inset-bottom), 34px); 
             padding-top: 8px;
@@ -200,11 +195,11 @@
                 const activeBonus = record?.status === 'done' ? Math.floor((stats.streakBefore + 1) / 7) * 10 : stats.bonusPercent;
 
                 return (
-                    <div className={`px-3 py-2.5 flex transition-colors ${record?.status === 'done' ? 'bg-emerald-50/40' : record?.status === 'missed' ? 'bg-red-50/40' : 'bg-white hover:bg-gray-50'} ${isSub ? 'pl-7 relative' : ''}`}>
+                    <div className={`px-3 py-2 flex transition-colors ${record?.status === 'done' ? 'bg-emerald-50/40' : record?.status === 'missed' ? 'bg-red-50/40' : 'bg-white hover:bg-gray-50'} ${isSub ? 'pl-7 relative' : ''}`}>
                         {isSub && <div className="absolute left-2.5 top-3.5 text-gray-300"><Icon name="corner-down-right" className="w-4 h-4" /></div>}
                         
-                        <div className="flex-1 flex flex-col justify-center min-w-0 pr-3 space-y-1">
-                            <div className="flex items-center space-x-2 overflow-hidden">
+                        <div className="flex-1 flex flex-col justify-center min-w-0 pr-3">
+                            <div className="flex items-center space-x-2 overflow-hidden mb-1">
                                 <span className={`truncate text-gray-800 ${isSub ? 'text-[14px] font-medium' : 'text-[15px] font-bold'}`}>{habit.name}</span>
                                 {currentStreakDisplay > 0 && <span className={`flex items-center shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${activeBonus > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}`}><Icon name="flame" className="w-3 h-3 mr-0.5" /> {currentStreakDisplay}</span>}
                             </div>
@@ -224,7 +219,7 @@
                                     <button onClick={() => handleMarkHabit(habit, 'done')} className="flex items-center justify-center px-4 py-2 bg-emerald-100 text-emerald-600 rounded-xl hover:bg-emerald-200 active:bg-emerald-300 active:scale-95 transition-all duration-150">
                                         <Icon name="circle-check" className="w-6 h-6" />
                                     </button>
-                                    <button onClick={() => handleMarkHabit(habit, 'missed')} className="flex items-center justify-center px-4 py-2 bg-red-100 text-red-500 rounded-xl hover:bg-red-200 active:bg-red-300 active:scale-95 transition-all duration-150">
+                                    <button onClick={() => handleMarkHabit(habit, 'missed')} className="flex items-center justify-center px-4 py-2 bg-red-100 text-red-700 rounded-xl hover:bg-red-200 active:bg-red-300 active:scale-95 transition-all duration-150">
                                         <Icon name="circle-x" className="w-6 h-6" />
                                     </button>
                                 </>
@@ -241,7 +236,7 @@
             const renderTracker = () => {
                 const mainHabits = habits.filter(h => !h.parentId);
                 return (
-                    <div className="space-y-2 pb-2">
+                    <div className="space-y-1.5 pb-2">
                         {mainHabits.length === 0 ? <p className="text-center text-gray-500 py-8 text-sm">Привычек нет.</p> : mainHabits.map(mainHabit => (
                             <div key={mainHabit.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                                 <HabitRow habit={mainHabit} isSub={false} />
@@ -315,12 +310,12 @@
                 );
             };
 
-            /* Тот самый контейнер с 100dvh */
+            /* Использование 100dvh для основного контейнера приложения */
             return (
                 <div style={{ height: '100dvh' }} className="w-full bg-white font-sans text-gray-900 flex justify-center">
                     <div className="w-full max-w-md bg-gray-50 flex flex-col h-full relative overflow-hidden shadow-2xl">
                         
-                        <header className="shrink-0 bg-indigo-600 text-white pb-3 px-4 shadow-md rounded-b-[1.25rem] z-20 relative pt-safe">
+                        <header className="shrink-0 bg-indigo-600 text-white pb-3 px-4 shadow-md rounded-b-[1.25rem] z-20 pt-safe">
                             <div className="flex items-center justify-between mb-2 h-7 mt-1">
                                 {activeTab === 'tracker' ? (
                                     <><button onClick={() => shiftDate(-1)} className="p-1 bg-white/10 rounded-md backdrop-blur-sm flex justify-center items-center"><Icon name="chevron-left" className="w-4 h-4 text-white" /></button><h1 className="text-[15px] font-bold tracking-wide">{formatDateHeader(currentDate)}</h1><button onClick={() => shiftDate(1)} className="p-1 bg-white/10 rounded-md backdrop-blur-sm flex justify-center items-center"><Icon name="chevron-right" className="w-4 h-4 text-white" /></button></>
@@ -348,15 +343,15 @@
                         <nav className="shrink-0 w-full bg-white/95 backdrop-blur-xl border-t border-gray-100 shadow-[0_-5px_10px_rgba(0,0,0,0.03)] z-20 px-2 bottom-nav-safe">
                             <div className="flex justify-around items-center">
                                 <button onClick={() => setActiveTab('tracker')} className={`flex-1 flex flex-col items-center justify-center space-y-[3px] py-1 ${activeTab === 'tracker' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                                    <Icon name="circle-check" className="w-[22px] h-[22px]" />
+                                    <Icon name="circle-check" className="w-[20px] h-[20px]" />
                                     <span className="text-[9px] font-bold uppercase tracking-widest">Трекер</span>
                                 </button>
                                 <button onClick={() => setActiveTab('shop')} className={`flex-1 flex flex-col items-center justify-center space-y-[3px] py-1 ${activeTab === 'shop' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                                    <Icon name="store" className="w-[22px] h-[22px]" />
+                                    <Icon name="store" className="w-[20px] h-[20px]" />
                                     <span className="text-[9px] font-bold uppercase tracking-widest">Магазин</span>
                                 </button>
                                 <button onClick={() => setActiveTab('settings')} className={`flex-1 flex flex-col items-center justify-center space-y-[3px] py-1 ${activeTab === 'settings' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                                    <Icon name="settings" className="w-[22px] h-[22px]" />
+                                    <Icon name="settings" className="w-[20px] h-[20px]" />
                                     <span className="text-[9px] font-bold uppercase tracking-widest">Настройки</span>
                                 </button>
                             </div>
@@ -371,5 +366,4 @@
     </script>
 </body>
 </html>
-
 
