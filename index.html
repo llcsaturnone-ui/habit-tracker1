@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <!-- Шаг 1 из вашего совета: viewport-fit=cover уже тут есть -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,11 +15,23 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
-        body { background-color: #ffffff; margin: 0; padding: 0; overflow: hidden; -webkit-user-select: none; user-select: none; }
+        /* Применяем 100dvh к самому body, чтобы избежать прыжков Safari */
+        html, body { 
+            background-color: #ffffff; 
+            margin: 0; 
+            padding: 0; 
+            height: 100dvh; 
+            overflow: hidden; 
+            -webkit-user-select: none; 
+            user-select: none; 
+        }
         ::-webkit-scrollbar { display: none; }
         
-        /* Оставляем только отступ для верхнего островка (камеры) */
+        /* Защита верхнего островка */
         .pt-safe { padding-top: max(env(safe-area-inset-top), 20px); }
+        
+        /* Шаг 2 из вашего совета: защита нижнего меню */
+        .pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 16px); }
     </style>
 </head>
 <body>
@@ -288,12 +301,12 @@
                 );
             };
 
-            // Главный контейнер теперь fixed inset-0, чтобы гарантированно занимать 100% экрана
+            // Главный контейнер: h-[100dvh] + Flexbox. Убрали "absolute bottom-0" у навигации.
             return (
-                <div className="fixed inset-0 w-full bg-white font-sans text-gray-900 flex justify-center">
+                <div className="h-[100dvh] w-full bg-white font-sans text-gray-900 flex justify-center">
                     <div className="w-full max-w-md bg-gray-50 flex flex-col h-full relative overflow-hidden">
                         
-                        <header className="shrink-0 bg-indigo-600 text-white pb-3 px-4 shadow-md rounded-b-[1.25rem] z-20 relative pt-safe">
+                        <header className="shrink-0 bg-indigo-600 text-white pb-3 px-4 shadow-md rounded-b-[1.25rem] z-20 pt-safe">
                             <div className="flex items-center justify-between mb-2 h-7 mt-1">
                                 {activeTab === 'tracker' ? (
                                     <><button onClick={() => shiftDate(-1)} className="p-1 bg-white/10 rounded-md backdrop-blur-sm flex justify-center items-center"><Icon name="chevron-left" className="w-4 h-4 text-white" /></button><h1 className="text-[15px] font-bold tracking-wide">{formatDateHeader(currentDate)}</h1><button onClick={() => shiftDate(1)} className="p-1 bg-white/10 rounded-md backdrop-blur-sm flex justify-center items-center"><Icon name="chevron-right" className="w-4 h-4 text-white" /></button></>
@@ -312,14 +325,16 @@
                             </div>
                         </header>
                         
-                        <main className="flex-1 overflow-y-auto px-2 pt-2 pb-20 z-0">
+                        <main className="flex-1 overflow-y-auto px-2 pt-2 z-0">
                             {activeTab === 'tracker' && renderTracker()}
                             {activeTab === 'shop' && renderShop()}
                             {activeTab === 'settings' && renderSettings()}
                         </main>
 
-                        {/* Навигация строго привязана к низу (bottom-0) с небольшим отступом (pb-4 = 16px) чтобы не перекрывать полоску */}
-                        <nav className="absolute bottom-0 w-full bg-white/95 backdrop-blur-xl border-t border-gray-100 shadow-[0_-5px_10px_rgba(0,0,0,0.03)] z-20 px-2 pt-2 pb-4">
+                        {/* Навигация теперь не "absolute", а просто замыкающий блок flex-контейнера. 
+                            Класс pb-safe заставляет ее фон "протекать" до самого низа айфона, 
+                            а сами кнопки остаются над полоской. */}
+                        <nav className="shrink-0 w-full bg-white/95 backdrop-blur-xl border-t border-gray-100 shadow-[0_-5px_10px_rgba(0,0,0,0.03)] z-20 px-2 pt-2 pb-safe">
                             <div className="flex justify-around items-center">
                                 <button onClick={() => setActiveTab('tracker')} className={`flex-1 flex flex-col items-center justify-center space-y-[3px] py-1 ${activeTab === 'tracker' ? 'text-indigo-600' : 'text-gray-400'}`}>
                                     <Icon name="circle-check" className="w-[22px] h-[22px]" />
