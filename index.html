@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- Идеальное решение для верха: системно красим статус-бар iOS в цвет шапки -->
+    <!-- Идеальное решение для покраски верха без поломок CSS -->
     <meta name="theme-color" content="#4f46e5">
     <title>Трекер Дисциплины</title>
     
@@ -16,28 +16,32 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
-        /* Возвращаем кристально белый фон, чтобы низ (подбородок) сливался с навигацией */
+        /* ТОТ САМЫЙ КОД, КОТОРЫЙ СРАБОТАЛ ИДЕАЛЬНО */
         html { 
             height: 100%; 
-            background-color: #ffffff; 
+            background-color: #ffffff; /* Фон строго белый, чтобы низ не красился */
         }
         
-        body, #root { 
+        body { 
             background-color: #ffffff; 
             margin: 0; 
             padding: 0; 
-            height: 100%; 
+            height: 100%;
             overflow: hidden; 
             -webkit-user-select: none; 
             user-select: none; 
         }
+
+        #root {
+            height: 100%;
+            overflow: hidden;
+        }
         
         ::-webkit-scrollbar { display: none; }
         
-        /* Защита верхнего островка (камеры) */
         .pt-safe { padding-top: max(env(safe-area-inset-top), 20px); }
         
-        /* Точная защита нижнего меню (34px) - как в той версии, которая сработала идеально */
+        /* Та самая формула, убирающая подбородок */
         .bottom-nav-safe { 
             padding-bottom: max(env(safe-area-inset-bottom), 34px); 
             padding-top: 8px;
@@ -311,8 +315,9 @@
                 );
             };
 
+            /* Тот самый контейнер с 100dvh */
             return (
-                <div style={{ height: '100dvh' }} className="w-full font-sans text-gray-900 flex justify-center">
+                <div style={{ height: '100dvh' }} className="w-full bg-white font-sans text-gray-900 flex justify-center">
                     <div className="w-full max-w-md bg-gray-50 flex flex-col h-full relative overflow-hidden shadow-2xl">
                         
                         <header className="shrink-0 bg-indigo-600 text-white pb-3 px-4 shadow-md rounded-b-[1.25rem] z-20 relative pt-safe">
