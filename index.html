@@ -2,7 +2,6 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <!-- Убран viewport-fit=cover для идеальной геометрии снизу -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16,26 +15,45 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+            -webkit-touch-callout: none; /* Убирает всплывающее меню и лупу при долгом нажатии */
+            -webkit-user-select: none;   /* Блокирует выделение текста */
+            user-select: none;
+        }
+
+        /* Возвращаем возможность писать текст в полях ввода */
+        input, textarea {
+            -webkit-user-select: auto;
+            user-select: auto;
+        }
+
         html, body, #root { 
             height: 100%; 
             width: 100%;
             overflow: hidden;
-            background: #4f46e5;
-            -webkit-user-select: none; 
-            user-select: none;
+            background: #4f46e5; /* Фон под шторкой (синий) */
+            -webkit-tap-highlight-color: transparent;
         }
+        
         ::-webkit-scrollbar { display: none; }
+
+        /* Плавная анимация колец прогресса */
+        .circle-progress {
+            transition: stroke-dashoffset 0.3s ease-out;
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
 
         const Icon = ({ name, className }) => {
-            const spanRef = React.useRef(null);
+            const spanRef = useRef(null);
             useEffect(() => {
                 if (spanRef.current) {
                     spanRef.current.innerHTML = `<i data-lucide="${name}" class="${className || ''}"></i>`;
@@ -65,6 +83,9 @@
             const [records, setRecords] = useState({});
             const [shopItems, setShopItems] = useState([]);
             
+            const [tasbihCount, setTasbihCount] = useState(0);
+            const audioCtxRef = useRef(null);
+
             const todayString = new Date().toISOString().split('T')[0];
             const [currentDate, setCurrentDate] = useState(() => todayString);
             
@@ -74,23 +95,28 @@
             const [newItemName, setNewItemName] = useState('');
             const [newItemPrice, setNewItemPrice] = useState('');
 
-            // Состояние для отслеживания свайпов
             const [touchStartX, setTouchStartX] = useState(null);
 
+            // Состояния для долгого нажатия сброса
+            const [resetProgress, setResetProgress] = useState(0);
+            const holdAnimRef = useRef(null);
+            const holdStartRef = useRef(0);
+
             useEffect(() => {
-                const savedData = localStorage.getItem('islamicHabitTrackerV4');
+                const savedData = localStorage.getItem('islamicHabitTrackerLightV1');
                 if (savedData) {
                     const parsed = JSON.parse(savedData);
                     setBudget(parsed.budget || 10000);
                     setHabits(parsed.habits && parsed.habits.length > 0 ? parsed.habits : initialHabits);
                     setRecords(parsed.records || {});
                     setShopItems(parsed.shopItems || []);
+                    setTasbihCount(parsed.tasbihCount || 0);
                 }
             }, []);
 
             useEffect(() => {
-                localStorage.setItem('islamicHabitTrackerV4', JSON.stringify({ budget, habits, records, shopItems }));
-            }, [budget, habits, records, shopItems]);
+                localStorage.setItem('islamicHabitTrackerLightV1', JSON.stringify({ budget, habits, records, shopItems, tasbihCount }));
+            }, [budget, habits, records, shopItems, tasbihCount]);
 
             const totalHabits = habits.length;
             const standardPrice = totalHabits > 0 ? (budget / (totalHabits * 7)) : 0;
@@ -116,11 +142,8 @@
             const currentBalance = totalEarnedAndFined - totalSpent;
 
             const formatMoney = (val) => Number(val).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' ₽';
-            
-            // Обновленная функция форматирования даты (с подписью "Сегодня")
             const formatDateHeader = (dateStr) => {
                 if (dateStr === todayString) return 'Сегодня';
-                
                 const d = new Date(dateStr);
                 return `${d.getDate()} ${d.toLocaleDateString('ru-RU', { month: 'long' })}, ${d.toLocaleDateString('ru-RU', { weekday: 'short' }).charAt(0).toUpperCase() + d.toLocaleDateString('ru-RU', { weekday: 'short' }).slice(1)}`;
             };
@@ -140,22 +163,13 @@
                 const d = new Date(currentDate); d.setDate(d.getDate() + days); setCurrentDate(d.toISOString().split('T')[0]);
             };
 
-            // Обработчики свайпов для переключения дат
-            const handleTouchStart = (e) => {
-                setTouchStartX(e.targetTouches[0].clientX);
-            };
-
+            const handleTouchStart = (e) => { setTouchStartX(e.targetTouches[0].clientX); };
             const handleTouchEnd = (e) => {
                 if (touchStartX === null) return;
                 const touchEndX = e.changedTouches[0].clientX;
                 const diff = touchStartX - touchEndX;
-
-                // Если палец сдвинулся больше чем на 50 пикселей
-                if (diff > 50) {
-                    shiftDate(1); // Свайп влево -> следующий день
-                } else if (diff < -50) {
-                    shiftDate(-1); // Свайп вправо -> предыдущий день
-                }
+                if (diff > 50) shiftDate(1);
+                else if (diff < -50) shiftDate(-1);
                 setTouchStartX(null);
             };
 
@@ -167,21 +181,115 @@
             };
             const handleBuyItem = (item) => currentBalance >= item.price ? setShopItems(shopItems.map(i => i.id === item.id ? { ...i, isBought: true } : i)) : alert('Недостаточно средств!');
             const handleDeleteItem = (id) => setShopItems(shopItems.filter(i => i.id !== id));
-            
-            // Функция дублирования
-            const handleDuplicateItem = (item) => {
-                setShopItems([...shopItems, { 
-                    id: Date.now().toString(), 
-                    name: item.name, 
-                    price: item.price, 
-                    isBought: false 
-                }]);
-            };
+            const handleDuplicateItem = (item) => setShopItems([...shopItems, { id: Date.now().toString(), name: item.name, price: item.price, isBought: false }]);
 
             const handleAddMainHabit = () => { if (newHabitName.trim()) { setHabits([...habits, { id: Date.now().toString(), name: newHabitName.trim(), parentId: null, customPrice: null }]); setNewHabitName(''); }};
             const handleAddSubHabit = (parentId) => { if (newSubName.trim()) { setHabits([...habits, { id: Date.now().toString(), name: newSubName.trim(), parentId, customPrice: null }]); setNewSubName(''); setAddingSubTo(null); }};
             const handleDeleteHabit = (id) => setHabits(habits.filter(h => h.id !== id && h.parentId !== id));
             const handleCustomPriceChange = (id, value) => setHabits(habits.map(h => h.id === id ? { ...h, customPrice: value === '' ? null : value } : h));
+
+            // Синтезатор звука (Приятные звуки)
+            const playSound = (isSpecial) => {
+                try {
+                    if (!audioCtxRef.current) {
+                        const AudioContext = window.AudioContext || window.webkitAudioContext;
+                        audioCtxRef.current = new AudioContext();
+                    }
+                    const ctx = audioCtxRef.current;
+                    if (ctx.state === 'suspended') ctx.resume();
+
+                    if (isSpecial) {
+                        // Приятный мажорный перезвон (ноты До и Ми)
+                        const osc1 = ctx.createOscillator();
+                        const gain1 = ctx.createGain();
+                        osc1.type = 'sine';
+                        osc1.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+                        gain1.gain.setValueAtTime(0, ctx.currentTime);
+                        gain1.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.05);
+                        gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                        osc1.connect(gain1);
+                        gain1.connect(ctx.destination);
+                        osc1.start(ctx.currentTime);
+                        osc1.stop(ctx.currentTime + 0.5);
+
+                        const osc2 = ctx.createOscillator();
+                        const gain2 = ctx.createGain();
+                        osc2.type = 'sine';
+                        osc2.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1); // E5 (с микро-задержкой)
+                        gain2.gain.setValueAtTime(0, ctx.currentTime + 0.1);
+                        gain2.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.15);
+                        gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+                        osc2.connect(gain2);
+                        gain2.connect(ctx.destination);
+                        osc2.start(ctx.currentTime + 0.1);
+                        osc2.stop(ctx.currentTime + 0.6);
+                    } else {
+                        // Мягкий звук "капли" для обычного клика
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sine';
+                        
+                        // Быстрый спад частоты создает эффект капли/щелчка
+                        osc.frequency.setValueAtTime(400, ctx.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.05);
+                        
+                        gain.gain.setValueAtTime(0, ctx.currentTime);
+                        gain.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.01);
+                        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+                        
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(ctx.currentTime);
+                        osc.stop(ctx.currentTime + 0.1);
+                    }
+                } catch (e) {
+                    console.error("Audio error:", e);
+                }
+            };
+
+            const handleTasbihTap = (e) => {
+                let newCount = tasbihCount + 1;
+                if (newCount > 99) newCount = 1; 
+                const isSpecial = newCount === 33 || newCount === 66 || newCount === 99;
+
+                playSound(isSpecial);
+
+                if (navigator.vibrate) {
+                    if (isSpecial) navigator.vibrate([100, 50, 100]); 
+                    else navigator.vibrate(10); 
+                }
+
+                setTasbihCount(newCount);
+            };
+
+            // Логика долгого удержания кнопки сброса
+            const startResetHold = (e) => {
+                e.stopPropagation();
+                if (navigator.vibrate) navigator.vibrate(15);
+                holdStartRef.current = Date.now();
+                
+                const animate = () => {
+                    const elapsed = Date.now() - holdStartRef.current;
+                    const progress = Math.min((elapsed / 3000) * 100, 100); // 3 секунды удержания для комфорта
+                    setResetProgress(progress);
+                    
+                    if (progress >= 100) {
+                        setTasbihCount(0);
+                        if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+                        setResetProgress(0);
+                        cancelAnimationFrame(holdAnimRef.current);
+                    } else {
+                        holdAnimRef.current = requestAnimationFrame(animate);
+                    }
+                };
+                holdAnimRef.current = requestAnimationFrame(animate);
+            };
+
+            const stopResetHold = (e) => {
+                if (e) e.stopPropagation();
+                cancelAnimationFrame(holdAnimRef.current);
+                setResetProgress(0);
+            };
 
             const StatusBar = ({ habitId }) => {
                 const days = [];
@@ -275,7 +383,6 @@
                     <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
                         <h3 className="text-xs font-bold text-gray-800 mb-2 flex items-center"><Icon name="plus" className="w-3.5 h-3.5 mr-1.5 text-indigo-500"/> Добавить цель</h3>
                         <div className="flex space-x-1.5">
-                            {/* FIX ZOOM: text-[16px] */}
                             <input type="text" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} placeholder="Название" className="flex-1 p-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-[16px]" />
                             <input type="number" value={newItemPrice} onChange={(e) => setNewItemPrice(e.target.value)} placeholder="Цена ₽" className="w-20 p-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-[16px] text-center" />
                             <button onClick={handleAddItem} className="bg-indigo-600 text-white p-2 rounded-lg flex justify-center items-center"><Icon name="plus" className="w-5 h-5" /></button>
@@ -294,7 +401,6 @@
                                     ) : (
                                         <span className="px-2 py-1 bg-gray-200 text-gray-600 rounded-md text-[9px] font-bold uppercase tracking-wider flex items-center justify-center mr-1"><Icon name="circle-check" className="w-3 h-3 mr-1" /> Куплено</span>
                                     )}
-                                    {/* Новая кнопка Копировать */}
                                     <button onClick={() => handleDuplicateItem(item)} className="p-1.5 text-gray-400 hover:text-indigo-500 flex justify-center items-center rounded-md hover:bg-gray-100 transition-colors"><Icon name="copy" className="w-4 h-4" /></button>
                                     <button onClick={() => handleDeleteItem(item.id)} className="p-1.5 text-gray-400 hover:text-red-500 flex justify-center items-center rounded-md hover:bg-red-50 transition-colors"><Icon name="trash-2" className="w-4 h-4" /></button>
                                 </div>
@@ -311,7 +417,6 @@
                         <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
                             <h3 className="text-xs font-bold text-gray-800 mb-2 flex items-center"><Icon name="wallet" className="w-3.5 h-3.5 mr-1.5 text-indigo-500"/> Бюджет</h3>
                             <div className="space-y-2">
-                                {/* FIX ZOOM: text-[16px] */}
                                 <div><label className="block text-[10px] font-bold uppercase text-gray-500 mb-1">На 7 дней (₽)</label><input type="number" value={budget} onChange={(e) => setBudget(Number(e.target.value))} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-[16px]" /></div>
                                 <div className="bg-indigo-50 p-2 rounded-lg flex justify-between items-center text-indigo-900"><span className="font-semibold text-[10px] uppercase">Цена по умолчанию:</span><span className="font-bold text-sm">{formatMoney(standardPrice)}</span></div>
                             </div>
@@ -319,7 +424,6 @@
                         <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
                             <h3 className="text-xs font-bold text-gray-800 mb-2 flex items-center"><Icon name="settings" className="w-3.5 h-3.5 mr-1.5 text-indigo-500"/> Привычки</h3>
                             <div className="flex space-x-1.5 mb-3">
-                                {/* FIX ZOOM: text-[16px] */}
                                 <input type="text" value={newHabitName} onChange={(e) => setNewHabitName(e.target.value)} placeholder="Новая привычка..." className="flex-1 p-2 bg-gray-50 border rounded-lg outline-none text-[16px]" onKeyDown={(e) => e.key === 'Enter' && handleAddMainHabit()} />
                                 <button onClick={handleAddMainHabit} className="bg-indigo-600 text-white p-2 rounded-lg flex justify-center items-center"><Icon name="plus" className="w-5 h-5" /></button>
                             </div>
@@ -331,7 +435,6 @@
                                             <div className="flex items-center space-x-1 shrink-0">
                                                 <div className="flex flex-col w-16">
                                                     <span className="text-[7px] text-gray-500 uppercase font-bold tracking-widest mb-0.5 text-center">Своя ₽</span>
-                                                    {/* FIX ZOOM: text-[16px] */}
                                                     <input type="number" placeholder={Math.round(standardPrice)} value={main.customPrice || ''} onChange={(e) => handleCustomPriceChange(main.id, e.target.value)} className="w-full h-7 text-[16px] border rounded outline-none text-center" />
                                                 </div>
                                                 <button onClick={() => handleDeleteHabit(main.id)} className="p-1 text-red-400 mt-2.5 flex justify-center items-center"><Icon name="trash-2" className="w-4 h-4" /></button>
@@ -344,7 +447,6 @@
                                             <div className="flex items-center space-x-1 shrink-0">
                                                 <div className="flex flex-col w-16">
                                                     <span className="text-[7px] text-gray-500 uppercase font-bold tracking-widest mb-0.5 text-center">Своя ₽</span>
-                                                    {/* FIX ZOOM: text-[16px] */}
                                                     <input type="number" placeholder={Math.round(standardPrice)} value={sub.customPrice || ''} onChange={(e) => handleCustomPriceChange(sub.id, e.target.value)} className="w-full h-7 text-[16px] border rounded outline-none text-center" />
                                                 </div>
                                                 <button onClick={() => handleDeleteHabit(sub.id)} className="p-1 text-red-400 mt-2.5 flex justify-center items-center"><Icon name="trash-2" className="w-4 h-4" /></button>
@@ -353,7 +455,6 @@
                                         
                                         {addingSubTo === main.id ? 
                                         <div className="ml-3 flex space-x-1 mt-1">
-                                            {/* FIX ZOOM: text-[16px] */}
                                             <input autoFocus type="text" value={newSubName} onChange={(e) => setNewSubName(e.target.value)} placeholder="Название..." className="flex-1 h-7 text-[16px] border rounded outline-none px-2" onKeyDown={(e) => e.key === 'Enter' && handleAddSubHabit(main.id)} />
                                             <button onClick={() => handleAddSubHabit(main.id)} className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded h-7 text-[11px] font-bold">OK</button>
                                             <button onClick={() => setAddingSubTo(null)} className="bg-gray-100 text-gray-500 px-3 py-1 rounded h-7 text-[11px]">Отмена</button>
@@ -367,25 +468,100 @@
                 );
             };
 
+            const renderTasbih = () => {
+                const size = 260;
+                const strokeWidth = 14;
+                const center = size / 2;
+                
+                const radius99 = (size - strokeWidth) / 2;
+                const circ99 = 2 * Math.PI * radius99;
+                const offset99 = circ99 - (tasbihCount / 99) * circ99;
+
+                const radius33 = radius99 - strokeWidth - 8;
+                const circ33 = 2 * Math.PI * radius33;
+                const count33 = tasbihCount === 0 ? 0 : ((tasbihCount - 1) % 33) + 1;
+                const offset33 = circ33 - (count33 / 33) * circ33;
+
+                return (
+                    <div 
+                        className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 cursor-pointer active:bg-gray-100 transition-colors"
+                        onClick={handleTasbihTap}
+                    >
+                        <div className="relative flex items-center justify-center pointer-events-none" style={{ width: size, height: size }}>
+                            <svg width={size} height={size} className="transform -rotate-90 drop-shadow-xl">
+                                <circle cx={center} cy={center} r={radius99} fill="transparent" stroke="#e0e7ff" strokeWidth={strokeWidth} />
+                                <circle cx={center} cy={center} r={radius33} fill="transparent" stroke="#e0e7ff" strokeWidth={strokeWidth} />
+                                
+                                <circle 
+                                    className="circle-progress" cx={center} cy={center} r={radius99} 
+                                    fill="transparent" stroke="#4f46e5" strokeWidth={strokeWidth} strokeLinecap="round"
+                                    strokeDasharray={circ99} strokeDashoffset={offset99}
+                                />
+                                <circle 
+                                    className="circle-progress" cx={center} cy={center} r={radius33} 
+                                    fill="transparent" stroke="#0ea5e9" strokeWidth={strokeWidth} strokeLinecap="round"
+                                    strokeDasharray={circ33} strokeDashoffset={offset33}
+                                />
+                            </svg>
+
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                <span className="text-[5.5rem] font-extrabold text-indigo-900 tracking-tighter leading-none mt-2">
+                                    {tasbihCount}
+                                </span>
+                                <div className="flex flex-col items-center mt-2">
+                                    <span className="text-xs font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full">{count33} / 33</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <span className="mt-8 text-[10px] text-gray-400 font-bold uppercase tracking-widest pointer-events-none">
+                            Нажмите в любом месте экрана
+                        </span>
+                        
+                        {/* Кнопка сброса с защитой (удерживание) */}
+                        <div className="absolute bottom-8 z-10 flex flex-col items-center">
+                            <button 
+                                onPointerDown={startResetHold}
+                                onPointerUp={stopResetHold}
+                                onPointerLeave={stopResetHold}
+                                onPointerCancel={stopResetHold}
+                                className="relative overflow-hidden flex items-center justify-center px-6 py-3 bg-white text-gray-500 rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.05)] border border-gray-200 text-[10px] font-bold uppercase tracking-wider"
+                            >
+                                <div 
+                                    className="absolute left-0 top-0 bottom-0 bg-red-100/50 pointer-events-none"
+                                    style={{ width: `${resetProgress}%` }}
+                                ></div>
+                                
+                                <div className="relative z-10 flex items-center">
+                                    <Icon name="rotate-ccw" className={`w-3.5 h-3.5 mr-1.5 ${resetProgress > 0 ? 'text-red-500' : 'text-indigo-400'}`} />
+                                    <span className={resetProgress > 0 ? 'text-red-600' : ''}>
+                                        {resetProgress > 0 ? 'Удерживайте...' : 'Сброс'}
+                                    </span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                );
+            };
+
             return (
                 <div className="h-full w-full bg-gray-50 font-sans text-gray-900 flex justify-center">
                     <div className="w-full max-w-md flex flex-col h-full overflow-hidden">
                         
                         <header className="shrink-0 bg-indigo-600 text-white pb-3 px-4 pt-3 shadow-md rounded-b-[1.25rem] z-20">
-                            {/* Добавлены onTouchStart и onTouchEnd для свайпа дат */}
                             <div 
                                 className="flex items-center justify-between mb-2 h-7"
                                 onTouchStart={handleTouchStart}
                                 onTouchEnd={handleTouchEnd}
                             >
                                 {activeTab === 'tracker' ? (
-                                    <>
-                                        <button onClick={() => shiftDate(-1)} className="p-1 bg-white/10 rounded-md flex justify-center items-center"><Icon name="chevron-left" className="w-4 h-4 text-white" /></button>
-                                        <h1 className="text-[15px] font-bold tracking-wide">{formatDateHeader(currentDate)}</h1>
-                                        <button onClick={() => shiftDate(1)} className="p-1 bg-white/10 rounded-md flex justify-center items-center"><Icon name="chevron-right" className="w-4 h-4 text-white" /></button>
-                                    </>
-                                ) : <h1 className="text-[15px] font-bold tracking-wide text-center w-full">{activeTab === 'shop' ? 'Магазин Наград' : 'Настройки'}</h1>}
+                                    <><button onClick={() => shiftDate(-1)} className="p-1 bg-white/10 rounded-md flex justify-center items-center"><Icon name="chevron-left" className="w-4 h-4 text-white" /></button><h1 className="text-[15px] font-bold tracking-wide">{formatDateHeader(currentDate)}</h1><button onClick={() => shiftDate(1)} className="p-1 bg-white/10 rounded-md flex justify-center items-center"><Icon name="chevron-right" className="w-4 h-4 text-white" /></button></>
+                                ) : <h1 className="text-[15px] font-bold tracking-wide text-center w-full">
+                                    {activeTab === 'shop' ? 'Магазин Наград' : activeTab === 'settings' ? 'Настройки' : 'Тасбих'}
+                                </h1>}
                             </div>
+                            
+                            {/* Блок баланса теперь показывается на всех вкладках для сохранения одинаковой высоты шапки */}
                             <div className="bg-white/10 rounded-[0.85rem] p-2.5 border border-white/20">
                                 <p className="text-indigo-100 text-[9px] font-bold mb-0.5 uppercase tracking-widest opacity-80">Доступно</p>
                                 <div className="flex items-center space-x-1.5">
@@ -399,25 +575,29 @@
                             </div>
                         </header>
                         
-                        <main className="flex-1 overflow-y-auto px-2 pt-2">
+                        <main className="flex-1 overflow-y-auto px-2 pt-2 relative">
                             {activeTab === 'tracker' && renderTracker()}
                             {activeTab === 'shop' && renderShop()}
                             {activeTab === 'settings' && renderSettings()}
+                            {activeTab === 'tasbih' && renderTasbih()}
                         </main>
 
-                        {/* КЛАСС pb-7 ДЛЯ ИДЕАЛЬНОГО ОТСТУПА СНИЗУ */}
                         <nav className="shrink-0 w-full bg-white border-t border-gray-200 z-20 px-2 pt-1.5 pb-7">
                             <div className="flex justify-around items-center">
                                 <button onClick={() => setActiveTab('tracker')} className={`flex-1 flex flex-col items-center justify-center py-1 space-y-[2px] ${activeTab === 'tracker' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                                    <Icon name="circle-check" className="w-[22px] h-[22px]" />
+                                    <Icon name="circle-check" className="w-[20px] h-[20px]" />
                                     <span className="text-[9px] font-bold uppercase tracking-widest">Трекер</span>
                                 </button>
                                 <button onClick={() => setActiveTab('shop')} className={`flex-1 flex flex-col items-center justify-center py-1 space-y-[2px] ${activeTab === 'shop' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                                    <Icon name="store" className="w-[22px] h-[22px]" />
+                                    <Icon name="store" className="w-[20px] h-[20px]" />
                                     <span className="text-[9px] font-bold uppercase tracking-widest">Магазин</span>
                                 </button>
+                                <button onClick={() => setActiveTab('tasbih')} className={`flex-1 flex flex-col items-center justify-center py-1 space-y-[2px] ${activeTab === 'tasbih' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                                    <Icon name="target" className="w-[20px] h-[20px]" />
+                                    <span className="text-[9px] font-bold uppercase tracking-widest">Тасбих</span>
+                                </button>
                                 <button onClick={() => setActiveTab('settings')} className={`flex-1 flex flex-col items-center justify-center py-1 space-y-[2px] ${activeTab === 'settings' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                                    <Icon name="settings" className="w-[22px] h-[22px]" />
+                                    <Icon name="settings" className="w-[20px] h-[20px]" />
                                     <span className="text-[9px] font-bold uppercase tracking-widest">Настройки</span>
                                 </button>
                             </div>
